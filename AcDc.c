@@ -28,6 +28,7 @@ int main( int argc, char *argv[] )
             symtab = build(program);
             check(&program, &symtab);
             gencode(program, target);
+            // test_parser(source);
         }
     }
     else{
@@ -184,6 +185,38 @@ Declarations *parseDeclarations( FILE *source )
     }
 }
 
+float evalFloat(float l, float r, TokenType optype) {
+    switch (optype) {
+        case PlusOp: 
+            return l + r;
+        case MinusOp:
+            return l - r;
+        case MulOp:
+            return l * r;
+        case DivOp:
+            return l / r;
+        default:
+            printf("Error: Error in evalFloat\n");
+            exit(1);
+    }
+}
+
+int evalInt(int l, int r, TokenType optype) {
+    switch (optype) {
+        case PlusOp: 
+            return l + r;
+        case MinusOp:
+            return l - r;
+        case MulOp:
+            return l * r;
+        case DivOp:
+            return l / r;
+        default:
+            printf("Error: Error in evalInt\n");
+            exit(1);
+    }
+}
+
 Expression *parseValue( FILE *source )
 {
     Token token = scanner(source);
@@ -211,25 +244,81 @@ Expression *parseValue( FILE *source )
     return value;
 }
 
+Expression *constantFolding(Expression *lvalue, Expression *rvalue, TokenType optype) {
+    Expression *value;
+    ValueType ltype = (lvalue->v).type;
+    ValueType rtype = (rvalue->v).type;
+    if ((ltype == IntConst || ltype == FloatConst) && (rtype == IntConst || rtype == FloatConst)) {
+        value = (Expression *)malloc( sizeof(Expression) );
+        value->leftOperand = value->rightOperand = NULL;
+        ValueType type;
+        if (ltype == FloatConst || rtype == FloatConst) {
+            type = FloatConst;  
+        } else {
+            type = IntConst;
+        }
+        switch(type){
+            case IntConst:
+                (value->v).type = IntConst;
+                (value->v).val.ivalue = evalInt((lvalue->v).val.ivalue, (rvalue->v).val.ivalue, optype);
+                break;
+            case FloatConst:
+                (value->v).type = FloatConst;
+                float l, r;
+                if (ltype == IntConst) {
+                    l = (float)((lvalue->v).val.ivalue);
+                } else {
+                    l = (lvalue->v).val.fvalue;
+                }
+                if (rtype == IntConst) {
+                    r = (float)((rvalue->v).val.ivalue);
+                } else {
+                    r = (rvalue->v).val.fvalue;
+                }
+                (value->v).val.fvalue = evalFloat(l, r, optype);
+                break;
+            default:
+                printf("Error: Error in constantFolding\n");
+                exit(1);
+        }
+        return value;
+    }
+    return NULL;
+}
+
 Expression *parseTermTail( FILE *source, Expression *lvalue )
 {
     Token token = scanner(source);
     Expression *expr;
+    Expression *rvalue;
+    Expression *cfRes;
 
     switch(token.type){
         case MulOp:
-            expr = (Expression *)malloc( sizeof(Expression) );
-            (expr->v).type = MulNode;
-            (expr->v).val.op = Mul;
-            expr->leftOperand = lvalue;
-            expr->rightOperand = parseValue(source);
+            rvalue = parseValue(source);
+            cfRes = constantFolding(lvalue, rvalue, MulOp);
+            if (cfRes != NULL) {
+                expr = cfRes;
+            } else {
+                expr = (Expression *)malloc( sizeof(Expression) );
+                (expr->v).type = MulNode;
+                (expr->v).val.op = Mul;
+                expr->leftOperand = lvalue;
+                expr->rightOperand = rvalue;
+            }
             return parseTermTail(source, expr);
         case DivOp:
-            expr = (Expression *)malloc( sizeof(Expression) );
-            (expr->v).type = DivNode;
-            (expr->v).val.op = Div;
-            expr->leftOperand = lvalue;
-            expr->rightOperand = parseValue(source);
+            rvalue = parseValue(source);
+            cfRes = constantFolding(lvalue, rvalue, DivOp);
+            if (cfRes != NULL) {
+                expr = cfRes;
+            } else {
+                expr = (Expression *)malloc( sizeof(Expression) );
+                (expr->v).type = DivNode;
+                (expr->v).val.op = Div;
+                expr->leftOperand = lvalue;
+                expr->rightOperand = rvalue;
+            }
             return parseTermTail(source, expr);
         case Alphabet:
         case PlusOp:
@@ -251,32 +340,46 @@ Expression *parseExpressionTail( FILE *source, Expression *lvalue )
     Token token = scanner(source);
     Expression *expr;
     Expression *nextValue, *term;
+    Expression *rvalue;
+    Expression *cfRes;
 
     switch(token.type){
         case PlusOp:
-            expr = (Expression *)malloc( sizeof(Expression) );
-            (expr->v).type = PlusNode;
-            (expr->v).val.op = Plus;
-            expr->leftOperand = lvalue;
             nextValue = parseValue(source);
             term = parseTermTail(source, nextValue);
             if (term != NULL) {
-                expr->rightOperand = term;
+                rvalue = term;
             } else {
-                expr->rightOperand = nextValue;
+                rvalue = nextValue;
+            }
+            cfRes = constantFolding(lvalue, rvalue, PlusOp);
+            if (cfRes != NULL) {
+                expr = cfRes;
+            } else {
+                expr = (Expression *)malloc( sizeof(Expression) );
+                (expr->v).type = PlusNode;
+                (expr->v).val.op = Plus;
+                expr->leftOperand = lvalue;
+                expr->rightOperand = rvalue;
             }
             return parseExpressionTail(source, expr);
         case MinusOp:
-            expr = (Expression *)malloc( sizeof(Expression) );
-            (expr->v).type = MinusNode;
-            (expr->v).val.op = Minus;
-            expr->leftOperand = lvalue;
             nextValue = parseValue(source);
             term = parseTermTail(source, nextValue);
             if (term != NULL) {
-                expr->rightOperand = term;
+                rvalue = term;
             } else {
-                expr->rightOperand = nextValue;
+                rvalue = nextValue;
+            }
+            cfRes = constantFolding(lvalue, rvalue, MinusOp);
+            if (cfRes != NULL) {
+                expr = cfRes;
+            } else {
+                expr = (Expression *)malloc( sizeof(Expression) );
+                (expr->v).type = MinusNode;
+                (expr->v).val.op = Minus;
+                expr->leftOperand = lvalue;
+                expr->rightOperand = rvalue;
             }
             return parseExpressionTail(source, expr);
         case Alphabet:
@@ -298,32 +401,46 @@ Expression *parseExpression( FILE *source, Expression *lvalue )
     Token token = scanner(source);
     Expression *expr;
     Expression *nextValue, *term;
+    Expression *rvalue;
+    Expression *cfRes;
 
     switch(token.type){
         case PlusOp:
-            expr = (Expression *)malloc( sizeof(Expression) );
-            (expr->v).type = PlusNode;
-            (expr->v).val.op = Plus;
-            expr->leftOperand = lvalue;
             nextValue = parseValue(source);
             term = parseTermTail(source, nextValue);
             if (term != NULL) {
-                expr->rightOperand = term;
+                rvalue = term;
             } else {
-                expr->rightOperand = nextValue;
+                rvalue = nextValue;
+            }
+            cfRes = constantFolding(lvalue, rvalue, PlusOp);
+            if (cfRes != NULL) {
+                expr = cfRes;
+            } else {
+                expr = (Expression *)malloc( sizeof(Expression) );
+                (expr->v).type = PlusNode;
+                (expr->v).val.op = Plus;
+                expr->leftOperand = lvalue;
+                expr->rightOperand = rvalue;
             }
             return parseExpressionTail(source, expr);
         case MinusOp:
-            expr = (Expression *)malloc( sizeof(Expression) );
-            (expr->v).type = MinusNode;
-            (expr->v).val.op = Minus;
-            expr->leftOperand = lvalue;
             nextValue = parseValue(source);
             term = parseTermTail(source, nextValue);
             if (term != NULL) {
-                expr->rightOperand = term;
+                rvalue = term;
             } else {
-                expr->rightOperand = nextValue;
+                rvalue = nextValue;
+            }
+            cfRes = constantFolding(lvalue, rvalue, MinusOp);
+            if (cfRes != NULL) {
+                expr = cfRes;
+            } else {
+                expr = (Expression *)malloc( sizeof(Expression) );
+                (expr->v).type = MinusNode;
+                (expr->v).val.op = Minus;
+                expr->leftOperand = lvalue;
+                expr->rightOperand = rvalue;
             }
             return parseExpressionTail(source, expr);
         case MulOp:
