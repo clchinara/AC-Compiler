@@ -108,7 +108,7 @@ typedef struct Program{
 
 /* For building the symbol table */
 typedef struct SymbolTable{
-    DataType table[26];
+    DataType table[23];
 } SymbolTable;
 
 

@@ -4,7 +4,7 @@
 #include <string.h>
 #include "header.h"
 
-char tableIndexToId[26][256];
+char tableIndexToId[23][256];
 
 int main( int argc, char *argv[] )
 {
@@ -636,7 +636,7 @@ void InitializeTable( SymbolTable *table )
 {
     int i;
 
-    for(i = 0 ; i < 26; i++)
+    for(i = 0 ; i < 23; i++)
         table->table[i] = Notype;
 }
 
@@ -657,7 +657,7 @@ SymbolTable build( Program program )
     InitializeTable(&table);
 
     int i = 0;
-    while(decls !=NULL && i < 26){
+    while(decls !=NULL && i < 23){
         current = decls->first;
         add_table(&table, current.name, current.type, i);
         i++;
@@ -712,7 +712,7 @@ DataType generalize( Expression *left, Expression *right )
 DataType lookup_table( SymbolTable *table, char c[256] )
 {
     int id = -1;
-    for (int i = 0; i < 26; i++) {
+    for (int i = 0; i < 23; i++) {
         if (strcmp(tableIndexToId[i], c) == 0) {
             id = i;
             break;
