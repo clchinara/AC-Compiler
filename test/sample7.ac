@@ -1,0 +1,8 @@
+f ants
+i bears
+f cats
+ants = 1 + 2.2 * 3 - bears + 2 - 1.1 + cats - 2 + 1
+cats = ants - 2.1 * 2 * bears
+p ants
+p cats
+p bears
